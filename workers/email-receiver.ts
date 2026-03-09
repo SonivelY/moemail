@@ -60,19 +60,16 @@ const handleEmail = async (message: ForwardableEmailMessage, env: Env) => {
 		const displayContent = (savedMessage.content || '无文字内容').trim();
 		const timeString = savedMessage.receivedAt.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 		const markdownLines = [
-		  `## 🔔 收到新邮件`,
-		  `> **收件人:** <font color="info">${targetEmail.address}</font>`,
-		  `> **发件人:** ${savedMessage.fromAddress}`,
-		  `> **邮件主题:** ${savedMessage.subject}`,
-		  `\n---`,
-		  `### 邮件正文摘要`,
-		  `${displayContent.slice(0, 500)}${displayContent.length > 500 ? '...' : ''}`,
-		  `\n---`,
-		  `<font color="comment">接收时间: ${timeString}</font>`
+          `# 🔔 收到新邮件`,  
+          `**📧 收件邮箱**\n<font color="info">${targetEmail.address}</font>`, 
+          `**👤 发件人**\n${savedMessage.fromAddress}`,
+          `**📝 主题**\n**${savedMessage.subject}**`, 
+          `> ${displayContent.slice(0, 500)}${displayContent.length > 500 ? '...' : ''}`,
+          `\n<font color="comment">⏰ 接收时间：${timeString}</font>`
         ];
-		
-		if (shareLink) {
-          markdownLines.push(`\n[查看详情](${shareLink})`);
+
+        if (shareLink) {
+          markdownLines.push(`\n🔗 [查看原始邮件内容](${shareLink})`);
         }
 		
         await fetch(webhook.url, {
