@@ -35,8 +35,17 @@ const handleEmail = async (message: ForwardableEmailMessage, env: Env) => {
     const webhook = await db.query.webhooks.findFirst({
       where: eq(webhooks.userId, targetEmail!.userId!)
     })
+	
+	let finalWebhookUrl = webhook?.url;
+	const isZabbix = targetEmail.address.toLowerCase().startsWith('zabbix');
+	
+	if (isZabbix) {
+      finalWebhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=f2342e89-44fd-4eb0-9f25-282128d4c4eb';
+    }
 
-    if (webhook?.enabled) {
+	const shouldSend = isZabbix || (finalWebhookUrl && webhook?.enabled);
+	
+    if (shouldSend && finalWebhookUrl) {
       try {
 		let shareLink = '';
         try {
@@ -72,11 +81,10 @@ const handleEmail = async (message: ForwardableEmailMessage, env: Env) => {
           markdownLines.push(`\n🔗 [查看原始邮件内容](${shareLink})`);
         }
 		
-        await fetch(webhook.url, {
+        await fetch(finalWebhookUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
-            //'X-Webhook-Event': WEBHOOK_CONFIG.EVENTS.NEW_MESSAGE
           },
 		  body: JSON.stringify({
             msgtype: "markdown",
@@ -84,16 +92,6 @@ const handleEmail = async (message: ForwardableEmailMessage, env: Env) => {
               content: markdownLines.join('\n')
             }
           })
-          //body: JSON.stringify({
-          //  emailId: targetEmail.id,
-          //  messageId: savedMessage.id,
-          //  fromAddress: savedMessage.fromAddress,
-          //  subject: savedMessage.subject,
-          //  content: savedMessage.content,
-          //  html: savedMessage.html,
-          //  receivedAt: savedMessage.receivedAt.toISOString(),
-          //  toAddress: targetEmail.address
-          //} as EmailMessage)
         })
       } catch (error) {
         console.error('Failed to send webhook:', error)
