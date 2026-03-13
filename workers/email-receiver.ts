@@ -35,63 +35,25 @@ const handleEmail = async (message: ForwardableEmailMessage, env: Env) => {
     const webhook = await db.query.webhooks.findFirst({
       where: eq(webhooks.userId, targetEmail!.userId!)
     })
-	
-	let finalWebhookUrl = webhook?.url;
-	const isZabbix = targetEmail.address.toLowerCase().startsWith('zabbix');
-	
-	if (isZabbix) {
-      finalWebhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=f2342e89-44fd-4eb0-9f25-282128d4c4eb';
-    }
 
-	const shouldSend = isZabbix || (finalWebhookUrl && webhook?.enabled);
-	
-    if (shouldSend && finalWebhookUrl) {
+    if (webhook?.enabled) {
       try {
-		let shareLink = '';
-        try {
-          const shareResponse = await fetch(`https://warpstorm.space/api/emails/${targetEmail.id}/messages/${savedMessage.id}/share`, {
-            method: 'POST',
-            headers: {
-              'X-API-Key': 'mk_gclKIQAiS9I1PySIi6k-6S7voWs7OOno',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ expiresIn: 86400000 }) // 24小时过期
-          });
-
-          if (shareResponse.ok) {
-            const shareData: { token: string } = await shareResponse.json();
-            shareLink = `https://warpstorm.space/shared/message/${shareData.token}`;
-          }
-        } catch (e) {
-          console.error('Failed to get share token:', e);
-        }
-		  
-		const displayContent = (savedMessage.content || '无文字内容').trim();
-		const timeString = savedMessage.receivedAt.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-		const markdownLines = [
-          `# 🔔 收到新邮件`,  
-          `**📧 收件邮箱**\n<font color="info">${targetEmail.address}</font>`, 
-          `**👤 发件人**\n${savedMessage.fromAddress}`,
-          `**📝 主题**\n**${savedMessage.subject}**`, 
-          `> ${displayContent.slice(0, 500)}${displayContent.length > 500 ? '...' : ''}`,
-          `\n<font color="comment">⏰ 接收时间：${timeString}</font>`
-        ];
-
-        if (shareLink) {
-          markdownLines.push(`\n🔗 [查看原始邮件内容](${shareLink})`);
-        }
-		
-        await fetch(finalWebhookUrl, {
+        await fetch(webhook.url, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Webhook-Event': WEBHOOK_CONFIG.EVENTS.NEW_MESSAGE
           },
-		  body: JSON.stringify({
-            msgtype: "markdown",
-            markdown: {
-              content: markdownLines.join('\n')
-            }
-          })
+          body: JSON.stringify({
+            emailId: targetEmail.id,
+            messageId: savedMessage.id,
+            fromAddress: savedMessage.fromAddress,
+            subject: savedMessage.subject,
+            content: savedMessage.content,
+            html: savedMessage.html,
+            receivedAt: savedMessage.receivedAt.toISOString(),
+            toAddress: targetEmail.address
+          } as EmailMessage)
         })
       } catch (error) {
         console.error('Failed to send webhook:', error)
